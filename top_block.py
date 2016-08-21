@@ -2,7 +2,7 @@
 ##################################################
 # GNU Radio Python Flow Graph
 # Title: Top Block
-# Generated: Fri Aug 12 08:42:48 2016
+# Generated: Fri Aug 19 12:41:59 2016
 ##################################################
 
 if __name__ == '__main__':
@@ -16,16 +16,19 @@ if __name__ == '__main__':
             print "Warning: failed to XInitThreads()"
 
 from gnuradio import analog
-from gnuradio import audio
 from gnuradio import blocks
 from gnuradio import eng_notation
-from gnuradio import filter
 from gnuradio import gr
+from gnuradio import wxgui
 from gnuradio.eng_option import eng_option
+from gnuradio.fft import window
 from gnuradio.filter import firdes
+from gnuradio.wxgui import fftsink2
 from gnuradio.wxgui import forms
+from gnuradio.wxgui import scopesink2
 from grc_gnuradio import wxgui as grc_wxgui
 from optparse import OptionParser
+import math
 import osmosdr
 import time
 import wx
@@ -40,94 +43,107 @@ class top_block(grc_wxgui.top_block_gui):
         ##################################################
         # Variables
         ##################################################
-        self.volume = volume = 1
-        self.samp_rate = samp_rate = 32000
+        self.samp_rate = samp_rate = 64000
+        self.freq = freq = 810112500
 
         ##################################################
         # Blocks
         ##################################################
-        _volume_sizer = wx.BoxSizer(wx.VERTICAL)
-        self._volume_text_box = forms.text_box(
+        _freq_sizer = wx.BoxSizer(wx.VERTICAL)
+        self._freq_text_box = forms.text_box(
         	parent=self.GetWin(),
-        	sizer=_volume_sizer,
-        	value=self.volume,
-        	callback=self.set_volume,
-        	label="Volume",
+        	sizer=_freq_sizer,
+        	value=self.freq,
+        	callback=self.set_freq,
+        	label="Frequency",
         	converter=forms.float_converter(),
         	proportion=0,
         )
-        self._volume_slider = forms.slider(
+        self._freq_slider = forms.slider(
         	parent=self.GetWin(),
-        	sizer=_volume_sizer,
-        	value=self.volume,
-        	callback=self.set_volume,
-        	minimum=0,
-        	maximum=100,
-        	num_steps=100,
+        	sizer=_freq_sizer,
+        	value=self.freq,
+        	callback=self.set_freq,
+        	minimum=805e6,
+        	maximum=815e6,
+        	num_steps=500,
         	style=wx.SL_HORIZONTAL,
         	cast=float,
         	proportion=1,
         )
-        self.Add(_volume_sizer)
-        self.rtlsdr_source_0 = osmosdr.source( args="numchan=" + str(1) + " " + "" )
-        self.rtlsdr_source_0.set_sample_rate(2e6)
-        self.rtlsdr_source_0.set_center_freq(858.564e6, 0)
-        self.rtlsdr_source_0.set_freq_corr(0, 0)
-        self.rtlsdr_source_0.set_dc_offset_mode(0, 0)
-        self.rtlsdr_source_0.set_iq_balance_mode(0, 0)
-        self.rtlsdr_source_0.set_gain_mode(False, 0)
-        self.rtlsdr_source_0.set_gain(10, 0)
-        self.rtlsdr_source_0.set_if_gain(20, 0)
-        self.rtlsdr_source_0.set_bb_gain(20, 0)
-        self.rtlsdr_source_0.set_antenna("", 0)
-        self.rtlsdr_source_0.set_bandwidth(0, 0)
+        self.Add(_freq_sizer)
+        self.wxgui_scopesink2_0 = scopesink2.scope_sink_f(
+        	self.GetWin(),
+        	title="Scope Plot",
+        	sample_rate=samp_rate,
+        	v_scale=.01,
+        	v_offset=0,
+        	t_scale=0,
+        	ac_couple=False,
+        	xy_mode=False,
+        	num_inputs=1,
+        	trig_mode=wxgui.TRIG_MODE_AUTO,
+        	y_axis_label="Counts",
+        )
+        self.Add(self.wxgui_scopesink2_0.win)
+        self.wxgui_fftsink2_0 = fftsink2.fft_sink_c(
+        	self.GetWin(),
+        	baseband_freq=0,
+        	y_per_div=10,
+        	y_divs=10,
+        	ref_level=0,
+        	ref_scale=2.0,
+        	sample_rate=samp_rate,
+        	fft_size=1024,
+        	fft_rate=15,
+        	average=False,
+        	avg_alpha=None,
+        	title="FFT Plot",
+        	peak_hold=False,
+        )
+        self.Add(self.wxgui_fftsink2_0.win)
+        self.osmosdr_source_0 = osmosdr.source( args="numchan=" + str(1) + " " + "" )
+        self.osmosdr_source_0.set_sample_rate(200000)
+        self.osmosdr_source_0.set_center_freq(freq, 0)
+        self.osmosdr_source_0.set_freq_corr(0, 0)
+        self.osmosdr_source_0.set_dc_offset_mode(0, 0)
+        self.osmosdr_source_0.set_iq_balance_mode(0, 0)
+        self.osmosdr_source_0.set_gain_mode(False, 0)
+        self.osmosdr_source_0.set_gain(10, 0)
+        self.osmosdr_source_0.set_if_gain(20, 0)
+        self.osmosdr_source_0.set_bb_gain(20, 0)
+        self.osmosdr_source_0.set_antenna("", 0)
+        self.osmosdr_source_0.set_bandwidth(0, 0)
           
-        self.rational_resampler_xxx_1 = filter.rational_resampler_fff(
-                interpolation=48,
-                decimation=500,
-                taps=None,
-                fractional_bw=None,
-        )
-        self.rational_resampler_xxx_0 = filter.rational_resampler_ccc(
-                interpolation=1,
-                decimation=4,
-                taps=None,
-                fractional_bw=None,
-        )
-        self.low_pass_filter_0 = filter.fir_filter_ccf(1, firdes.low_pass(
-        	1, 2e6, 100e3, 1e6, firdes.WIN_HAMMING, 6.76))
-        self.blocks_multiply_const_vxx_0 = blocks.multiply_const_vff((volume, ))
-        self.audio_sink_0 = audio.sink(48000, "", True)
-        self.analog_wfm_rcv_0 = analog.wfm_rcv(
-        	quad_rate=500e3,
-        	audio_decimation=1,
-        )
+        self.blocks_throttle_0 = blocks.throttle(gr.sizeof_gr_complex*1, samp_rate,True)
+        self.analog_quadrature_demod_cf_0 = analog.quadrature_demod_cf(1)
 
         ##################################################
         # Connections
         ##################################################
-        self.connect((self.analog_wfm_rcv_0, 0), (self.rational_resampler_xxx_1, 0))    
-        self.connect((self.blocks_multiply_const_vxx_0, 0), (self.audio_sink_0, 0))    
-        self.connect((self.low_pass_filter_0, 0), (self.analog_wfm_rcv_0, 0))    
-        self.connect((self.rational_resampler_xxx_0, 0), (self.low_pass_filter_0, 0))    
-        self.connect((self.rational_resampler_xxx_1, 0), (self.blocks_multiply_const_vxx_0, 0))    
-        self.connect((self.rtlsdr_source_0, 0), (self.rational_resampler_xxx_0, 0))    
+        self.connect((self.analog_quadrature_demod_cf_0, 0), (self.wxgui_scopesink2_0, 0))    
+        self.connect((self.blocks_throttle_0, 0), (self.wxgui_fftsink2_0, 0))    
+        self.connect((self.osmosdr_source_0, 0), (self.analog_quadrature_demod_cf_0, 0))    
+        self.connect((self.osmosdr_source_0, 0), (self.blocks_throttle_0, 0))    
 
-
-    def get_volume(self):
-        return self.volume
-
-    def set_volume(self, volume):
-        self.volume = volume
-        self.blocks_multiply_const_vxx_0.set_k((self.volume, ))
-        self._volume_slider.set_value(self.volume)
-        self._volume_text_box.set_value(self.volume)
 
     def get_samp_rate(self):
         return self.samp_rate
 
     def set_samp_rate(self, samp_rate):
         self.samp_rate = samp_rate
+        self.wxgui_fftsink2_0.set_sample_rate(self.samp_rate)
+        self.blocks_throttle_0.set_sample_rate(self.samp_rate)
+        self.wxgui_scopesink2_0.set_sample_rate(self.samp_rate)
+
+    def get_freq(self):
+        return self.freq
+
+    def set_freq(self, freq):
+        self.freq = freq
+        self._freq_slider.set_value(self.freq)
+        self._freq_text_box.set_value(self.freq)
+        self.osmosdr_source_0.set_center_freq(self.freq, 0)
 
 
 if __name__ == '__main__':
