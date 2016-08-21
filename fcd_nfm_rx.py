@@ -4,7 +4,7 @@
 # Title: FCD FM Receiver
 # Author: OZ9AEC
 # Description: Simple FM receiver using the Funcube Dongle
-# Generated: Fri Aug 12 08:35:51 2016
+# Generated: Thu Aug 18 16:38:49 2016
 ##################################################
 
 if __name__ == '__main__':
@@ -23,7 +23,6 @@ from gnuradio import analog
 from gnuradio import audio
 from gnuradio import blocks
 from gnuradio import eng_notation
-from gnuradio import fcd
 from gnuradio import filter
 from gnuradio import gr
 from gnuradio import qtgui
@@ -31,8 +30,10 @@ from gnuradio.eng_option import eng_option
 from gnuradio.filter import firdes
 from gnuradio.qtgui import Range, RangeWidget
 from optparse import OptionParser
+import osmosdr
 import sip
 import sys
+import time
 
 from distutils.version import StrictVersion
 class fcd_nfm_rx(gr.top_block, Qt.QWidget):
@@ -173,12 +174,22 @@ class fcd_nfm_rx(gr.top_block, Qt.QWidget):
         
         self._qtgui_freq_sink_x_0_win = sip.wrapinstance(self.qtgui_freq_sink_x_0.pyqwidget(), Qt.QWidget)
         self.top_grid_layout.addWidget(self._qtgui_freq_sink_x_0_win, 0,0,5,4)
+        self.osmosdr_source_1 = osmosdr.source( args="numchan=" + str(1) + " " + "" )
+        self.osmosdr_source_1.set_sample_rate(samp_rate)
+        self.osmosdr_source_1.set_center_freq(freq, 0)
+        self.osmosdr_source_1.set_freq_corr(0, 0)
+        self.osmosdr_source_1.set_dc_offset_mode(0, 0)
+        self.osmosdr_source_1.set_iq_balance_mode(0, 0)
+        self.osmosdr_source_1.set_gain_mode(False, 0)
+        self.osmosdr_source_1.set_gain(10, 0)
+        self.osmosdr_source_1.set_if_gain(20, 0)
+        self.osmosdr_source_1.set_bb_gain(20, 0)
+        self.osmosdr_source_1.set_antenna("", 0)
+        self.osmosdr_source_1.set_bandwidth(0, 0)
+          
         self.low_pass_filter = filter.fir_filter_ccf(1, firdes.low_pass(
         	1, samp_rate, width/2, trans, firdes.WIN_HAMMING, 6.76))
         self.freq_xlating_fir_filter_xxx_0 = filter.freq_xlating_fir_filter_ccc(1, (xlate_filter_taps), -(offset_coarse+offset_fine), samp_rate)
-        self.fcd_source_c_1 = fcd.source_c("hw:0")
-        self.fcd_source_c_1.set_freq(freq)
-            
         self.blocks_multiply_const_vxx_1 = blocks.multiply_const_vff((af_gain, ))
         self.audio_sink = audio.sink(48000, "", True)
         self.analog_simple_squelch_cc_0 = analog.simple_squelch_cc(sql_lev, 1)
@@ -196,10 +207,10 @@ class fcd_nfm_rx(gr.top_block, Qt.QWidget):
         self.connect((self.analog_simple_squelch_cc_0, 0), (self.analog_nbfm_rx_0, 0))    
         self.connect((self.blocks_multiply_const_vxx_1, 0), (self.audio_sink, 1))    
         self.connect((self.blocks_multiply_const_vxx_1, 0), (self.audio_sink, 0))    
-        self.connect((self.fcd_source_c_1, 0), (self.freq_xlating_fir_filter_xxx_0, 0))    
         self.connect((self.freq_xlating_fir_filter_xxx_0, 0), (self.low_pass_filter, 0))    
         self.connect((self.freq_xlating_fir_filter_xxx_0, 0), (self.qtgui_freq_sink_x_0, 0))    
         self.connect((self.low_pass_filter, 0), (self.analog_simple_squelch_cc_0, 0))    
+        self.connect((self.osmosdr_source_1, 0), (self.freq_xlating_fir_filter_xxx_0, 0))    
 
     def closeEvent(self, event):
         self.settings = Qt.QSettings("GNU Radio", "fcd_nfm_rx")
@@ -214,31 +225,32 @@ class fcd_nfm_rx(gr.top_block, Qt.QWidget):
         self.set_xlate_filter_taps(firdes.low_pass(1, self.samp_rate, 48000, 5000, firdes.WIN_HAMMING, 6.76))
         self.low_pass_filter.set_taps(firdes.low_pass(1, self.samp_rate, self.width/2, self.trans, firdes.WIN_HAMMING, 6.76))
         self.qtgui_freq_sink_x_0.set_frequency_range(self.rx_freq*self.display_selector, self.samp_rate)
+        self.osmosdr_source_1.set_sample_rate(self.samp_rate)
 
     def get_offset_fine(self):
         return self.offset_fine
 
     def set_offset_fine(self, offset_fine):
         self.offset_fine = offset_fine
-        self.freq_xlating_fir_filter_xxx_0.set_center_freq(-(self.offset_coarse+self.offset_fine))
         self.set_rx_freq(self._rx_freq_formatter(self.freq+(self.offset_coarse+self.offset_fine)))
+        self.freq_xlating_fir_filter_xxx_0.set_center_freq(-(self.offset_coarse+self.offset_fine))
 
     def get_offset_coarse(self):
         return self.offset_coarse
 
     def set_offset_coarse(self, offset_coarse):
         self.offset_coarse = offset_coarse
-        self.freq_xlating_fir_filter_xxx_0.set_center_freq(-(self.offset_coarse+self.offset_fine))
         self.set_rx_freq(self._rx_freq_formatter(self.freq+(self.offset_coarse+self.offset_fine)))
+        self.freq_xlating_fir_filter_xxx_0.set_center_freq(-(self.offset_coarse+self.offset_fine))
 
     def get_freq(self):
         return self.freq
 
     def set_freq(self, freq):
         self.freq = freq
-        self.fcd_source_c_1.set_freq(self.freq)
         Qt.QMetaObject.invokeMethod(self._freq_line_edit, "setText", Qt.Q_ARG("QString", eng_notation.num_to_str(self.freq)))
         self.set_rx_freq(self._rx_freq_formatter(self.freq+(self.offset_coarse+self.offset_fine)))
+        self.osmosdr_source_1.set_center_freq(self.freq, 0)
 
     def get_xlate_filter_taps(self):
         return self.xlate_filter_taps
@@ -281,7 +293,6 @@ class fcd_nfm_rx(gr.top_block, Qt.QWidget):
 
     def set_rf_gain(self, rf_gain):
         self.rf_gain = rf_gain
-        self.fcd_source_c_1.set_lna_gain(self.rf_gain)
 
     def get_display_selector(self):
         return self.display_selector
